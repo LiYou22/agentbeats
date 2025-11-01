@@ -45,7 +45,7 @@ async def talk_to_agent(query: str, target_url: str) -> str:
     Forward *query* to another A2A agent at *target_url* and stream back
     the plain-text response.
     """
-    # Increase timeout time to wait for response from small models like o4-mini
+    # Increase timeout time to wait for response
     httpx_client = httpx.AsyncClient(timeout=120.0)
     resolver = A2ACardResolver(httpx_client=httpx_client, base_url=target_url)
     card: AgentCard | None = await resolver.get_agent_card(

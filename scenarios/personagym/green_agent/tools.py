@@ -9,7 +9,6 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent))
 from eval_tasks import tasks, settings_list, question_requirements
 from utils import run_model
-from personas import benchmark_personas
 
 
 CODE_DIR = Path(__file__).parent.parent
@@ -221,11 +220,14 @@ def score_rubrics(sys_prompt, scoring_prompt, num_evals=1, return_explanations=T
 
 def score_answers(persona, task_to_qa, rubrics_path=full_rubrics_path, score_example=True, return_explanations=True):
     result = {task: {"scores": [], "reasons": []} for task in task_to_qa}
-    
+
     for task in task_to_qa:
         # Check if there are any Q&A pairs for the task before proceeding
         if not task_to_qa[task]:
+            print(f"DEBUG: Skipping task '{task}' - no Q&A pairs found")
             continue
+
+        print(f"DEBUG: Processing task '{task}' with {len(task_to_qa[task])} Q&A pairs")
 
         for i in range(0, len(task_to_qa[task]), 5):
             selected_qa = task_to_qa[task][i: i + 5]
@@ -245,8 +247,10 @@ def score_answers(persona, task_to_qa, rubrics_path=full_rubrics_path, score_exa
 
             if return_explanations:
                 score_result = score_rubrics(sys_prompt, scoring_prompt, return_explanations=True)
-                result[task]["scores"].append(score_result["average_score"])
-                
+                avg_score = score_result["average_score"]
+                result[task]["scores"].append(avg_score)
+                print(f"DEBUG: Task '{task}' batch score: {avg_score}")
+
                 # Get all explanations from this batch
                 all_explanations = []
                 for eval_round in score_result["detailed_explanations"]:
@@ -256,6 +260,7 @@ def score_answers(persona, task_to_qa, rubrics_path=full_rubrics_path, score_exa
             else:
                 score = score_rubrics(sys_prompt, scoring_prompt)
                 result[task]["scores"].append(score)
+                print(f"DEBUG: Task '{task}' batch score: {score}")
  
     return result
 
@@ -323,83 +328,6 @@ specialist_registry = SpecialistRegistry(SPECIALISTS_DIR)
 #########################################################
 
 @ab.tool
-def get_persona_by_index(persona_index: int) -> str:
-    """
-    Get a specific persona from the benchmark personas list by index.
-
-    Args:
-        persona_index: Index of the persona to retrieve (0-202)
-
-    Returns:
-        Persona description string
-
-    Raises:
-        ValueError: If index is out of range
-    """
-    if persona_index < 0 or persona_index >= len(benchmark_personas):
-        raise ValueError(f"Persona index {persona_index} out of range. Valid range: 0-{len(benchmark_personas)-1}")
-
-    return benchmark_personas[persona_index]
-
-
-@ab.tool
-def get_random_persona() -> str:
-    """
-    Select a random persona from the benchmark personas list.
-
-    Returns:
-        Randomly selected persona description string
-    """
-    return random.choice(benchmark_personas)
-
-
-@ab.tool
-def list_available_personas(start_index: int = 0, count: int = 10) -> str:
-    """
-    List available personas from the benchmark list.
-
-    Args:
-        start_index: Starting index (default: 0)
-        count: Number of personas to return (default: 10)
-
-    Returns:
-        JSON string with list of personas and their indices
-    """
-    end_index = min(start_index + count, len(benchmark_personas))
-    personas_subset = [
-        {"index": i, "persona": benchmark_personas[i]}
-        for i in range(start_index, end_index)
-    ]
-
-    return json.dumps({
-        "total_personas": len(benchmark_personas),
-        "start_index": start_index,
-        "count": len(personas_subset),
-        "personas": personas_subset
-    }, indent=2)
-
-
-@ab.tool
-def get_persona_from_white_agent(white_agent_url: str) -> str:
-    """
-    Retrieve persona description from white agent's profile endpoint.
-
-    Args:
-        white_agent_url: URL of the white agent
-
-    Returns:
-        Persona description string
-    """
-    client = httpx.Client(timeout=30.0)
-    profile_url = f"{white_agent_url}/profile"
-    response = client.get(profile_url)
-    response.raise_for_status()
-    profile_json = response.json()
-    client.close()
-    return profile_json["persona_description"]
-
-
-@ab.tool
 def generate_evaluation_questions(persona: str) -> str:
     """
     Generate evaluation questions based on persona and context.
@@ -432,9 +360,11 @@ def generate_evaluation_questions(persona: str) -> str:
 
             for task, templates in question_templates.items():
                 if templates:
-                    chosen_template = random.choice(templates)["template"]
-                    final_question = mutate_question_with_llm(persona, chosen_setting, chosen_template)
-                    questions_dict.setdefault(task,[]).append(final_question)
+                    # Generate 1 question per task for testing (change to 10 for full evaluation)
+                    for _ in range(1):
+                        chosen_template = random.choice(templates)["template"]
+                        final_question = mutate_question_with_llm(persona, chosen_setting, chosen_template)
+                        questions_dict.setdefault(task,[]).append(final_question)
     else:
         # Default dynamic workflow
         print("INFO: Using general evaluation criteria")
@@ -487,8 +417,10 @@ def evaluate_persona_responses(persona: str, task_to_qa_json: str, specialist_na
             # Average all batch scores for this task
             task_avg = sum(data['scores']) / len(data['scores'])
             numeric_scores[task] = task_avg
+            print(f"DEBUG: Final score for '{task}': {task_avg} (from {len(data['scores'])} batches)")
         else:
             numeric_scores[task] = 0
+            print(f"DEBUG: WARNING - No scores for '{task}', defaulting to 0. Data: {data}")
 
     # Then average across all tasks
     persona_score = sum(numeric_scores.values()) / len(numeric_scores) if numeric_scores else 0
