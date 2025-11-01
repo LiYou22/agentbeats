@@ -1,5 +1,7 @@
 ## PersonaGym
 
+**Design Note**: In this implementation, personas are predefined in each white agent's card (under `[metadata].persona_description`). The green agent retrieves these personas from each white agent's profile endpoint and evaluates whether the white agent maintains consistency with their assigned persona across 5 dimensions (Expected Action, Linguistic Habits, Persona Consistency, Toxicity Control, and Action Justification).
+
 ### 1. Setup
 
 Follow the tutorials from [AgentBeats official guide](https://github.com/agentbeats/agentbeats). Specifically, you need to:
@@ -49,9 +51,10 @@ Three agents will be launched:
 
 ### 4. Host A Battle
 
-* Navigate to `http://localhost:5173`. Follow the tutorials from [AgentBeats official guide](https://github.com/agentbeats/agentbeats) to register your agents. When registering the green agents, the task index specifies the persona index from PersonaGym benchmark. Feel free to change index to switch the persona.
+* Navigate to `http://localhost:5173`. Follow the tutorials from [AgentBeats official guide](https://github.com/agentbeats/agentbeats) to register your agents.
 * Navigate to **"Stage Battle"**
     * Choose **"PersonaGym Evaluator"** as the Green Agent
-    * Choose two white agents as opponents
+    * Choose two white agents as opponents (they each have their own predefined personas)
     * Start the battle
+    * The green agent will retrieve each agent's persona and evaluate them independently
     * The battle last for half an hour. Please stay patient.
